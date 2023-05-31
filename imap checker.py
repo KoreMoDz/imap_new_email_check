@@ -1,3 +1,11 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Wed May 31 02:45:38 2023
+
+@author: KoreMoDz
+"""
+
 import os
 import imaplib
 import email
@@ -5,16 +13,12 @@ import re
 import time
 from email.header import decode_header
 
-# Email server to connect to
-email_server = "mail.xx.xx"
-
 # Read credentials from a txt file. Each line should be in the format "email:password".
 # The file should be located in the same directory as the script.
 with open("credentials.txt", "r") as f:
     lines = f.readlines()
 
-# Extract only the lines that appear to contain an email address and password separated by a ':'.
-# We use a regular expression to do this.
+# Extract the email and password from each line in credentials.txt
 account_list = [re.findall(r"[^@]+@[^@]+\.[^@]+:[^\s]+", line.strip())[0] for line in lines if re.findall(r"[^@]+@[^@]+\.[^@]+:[^\s]+", line.strip())]
 
 # This is the file where the results will be written.
@@ -30,15 +34,20 @@ with open(output_file, "a") as f:
         f.write("-----------\n")
     f.write(f"Run of {current_time}\n\n")
 
+def generate_imap_server(email_address):
+    domain = email_address.split("@")[1]
+    return f"mail.{domain}"
+
 def check_inbox(account, password):
+    imap_server = generate_imap_server(account)
     try:
-        mail = imaplib.IMAP4_SSL(email_server)
+        mail = imaplib.IMAP4_SSL(imap_server)
         mail.login(account, password)
     except imaplib.IMAP4.error as e:
         # If there's an error during login, print it and return from the function.
         print(f"Error logging in to account: {account}. Error: {str(e)}")
         return
-    print(f"Successfully connected to account: {account}")
+    print(f"Successfully connected to account: {account} (IMAP Server: {imap_server})")
 
     mail.select("inbox")
 
@@ -76,22 +85,7 @@ def check_inbox(account, password):
 # Iterate over all the accounts in the list.
 for account_password in account_list:
     account, password = account_password.split(":")
-    # If the email server is different than the specified one, skip to the next account.
-    if "@" not in account or account.split("@")[1] != email_server:
-        print(f"The account {account} has a different email server, skipping...")
-        continue
-    # Try to connect and check the email, if it fails, wait and retry.
-    retries = 5
-    for attempt in range(retries):
-        try:
-            check_inbox(account, password)
-            break
-        except Exception as e:
-            if attempt < retries - 1:  # If it's not the last attempt, wait and retry
-                print(f"Error checking account: {account}. Error: {str(e)}. Retrying in 2 seconds...")
-                time.sleep(2)
-            else:  # If it's the last attempt, move to the next account
-                print(f"Error checking account: {account}. After {retries} attempts, moving to the next account.")
-
-
-
+    try:
+        check_inbox(account, password)
+    except Exception as e:
+        print(f"Error checking account: {account}. Error: {str(e)}")
