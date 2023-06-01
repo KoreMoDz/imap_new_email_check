@@ -12,80 +12,134 @@ import email
 import re
 import time
 from email.header import decode_header
+from colorama import Fore, init
+from bs4 import BeautifulSoup
+from datetime import datetime
 
-# Read credentials from a txt file. Each line should be in the format "email:password".
-# The file should be located in the same directory as the script.
+# Initialize colorama
+init()
+
+# Read credentials from a txt file
 with open("credentials.txt", "r") as f:
     lines = f.readlines()
 
-# Extract the email and password from each line in credentials.txt
 account_list = [re.findall(r"[^@]+@[^@]+\.[^@]+:[^\s]+", line.strip())[0] for line in lines if re.findall(r"[^@]+@[^@]+\.[^@]+:[^\s]+", line.strip())]
 
-# This is the file where the results will be written.
 output_file = "output.txt"
-
-# Check if the output file exists
 file_exists = os.path.exists(output_file)
 
-# Write the current run timestamp
 current_time = time.strftime("%x at %X")
-with open(output_file, "a") as f:
-    if not file_exists:
-        f.write("-----------\n")
-    f.write(f"Run of {current_time}\n\n")
+new_email_accounts = []  # Added: list to keep track of accounts with new emails
+no_new_email_accounts = []  # Added: list to keep track of accounts without new emails
 
 def generate_imap_server(email_address):
     domain = email_address.split("@")[1]
     return f"mail.{domain}"
 
-def check_inbox(account, password):
-    imap_server = generate_imap_server(account)
+def decode_email(email_data):
+    # List of common encodings to try
+    encodings = ['utf-8', 'ISO-8859-1', 'latin1', 'utf-16', 'windows-1252']
+    raw_email = None
+
+    # Try decoding the email using each encoding in the list
+    for encoding in encodings:
+        try:
+            raw_email = email_data.decode(encoding)
+            return raw_email
+        except UnicodeDecodeError:
+            pass
+    return None
+
+def check_mailbox(account, password):
+    server_imap = generate_imap_server(account)
     try:
-        mail = imaplib.IMAP4_SSL(imap_server)
+        mail = imaplib.IMAP4_SSL(server_imap)
         mail.login(account, password)
     except imaplib.IMAP4.error as e:
-        # If there's an error during login, print it and return from the function.
-        print(f"Error logging in to account: {account}. Error: {str(e)}")
+        print(Fore.RED + f"Error logging in to account: {account}. Error: {str(e)}")
         return
-    print(f"Successfully connected to account: {account} (IMAP Server: {imap_server})")
+    print(Fore.GREEN + f"Connection successful to account: {account} (IMAP Server: {server_imap})")
 
     mail.select("inbox")
 
     result, data = mail.uid("search", None, "(UNSEEN)")
     if result == "OK":
-        has_new_email = False  # Added: variable to track new emails
-        # Iterate over each email.
+        has_new_email = False
         for num in data[0].split():
-            result, email_data = mail.uid("fetch", num, "(BODY[HEADER])")
+            result, email_data = mail.uid("fetch", num, "(BODY[])")
             if result == "OK":
                 raw_email = email_data[0][1].decode("utf-8")
                 email_message = email.message_from_string(raw_email)
+
+                # Extract the email subject
                 subject = decode_header(email_message["Subject"])[0][0]
                 if isinstance(subject, bytes):
-                    # If the subject is in base64/quoted-printable encoding, decode it.
                     subject = subject.decode()
-                print(f"Account: {account} has a new email. Subject: {subject}")
-                has_new_email = True  # Added: indicate the presence of new emails
-                # Write the results to the output file only if there are new emails.
-                with open(output_file, "a") as f:
-                    f.write(f"Account: {account}:{password} | New email: {subject}\n")
+
+                # Extract the email content
+                email_content = ""
+                if email_message.is_multipart():
+                    for part in email_message.get_payload():
+                        if part.get_content_type() == "text/html":
+                            email_content += part.get_payload(decode=True).decode()
+                else:
+                    email_content = email_message.get_payload(decode=True)
+
+                # Search for the verification code in the email content
+                verification_code = None
+                link = None
+                if email_content:
+                    soup = BeautifulSoup(email_content, 'html.parser')
+
+                    # Search for the verification code in the email content
+                    code_tag = soup.find('p', class_='rc-2fa-code rc-2fa-code-override')
+                    if code_tag:
+                        verification_code = code_tag.get_text().strip()
+
+                    # Search for the link in the email content
+                    link_tag = soup.find('a', href=True)
+                    if link_tag:
+                        link = link_tag['href']
+                        # Decode the link if it is a Rockstar link
+                        if 'rockstargames' in link:
+                            link = urllib.parse.unquote(link)
+
+                if verification_code or link:
+                    print(Fore.GREEN + f"Account: {account} has a new email. Subject: {subject}. Verification code: {verification_code}, Link: {link}")
+                    has_new_email = True
+                    new_email_accounts.append((account, password, subject, verification_code, link))  # Added: save the account, verification code, and link in the list of new emails
+                else:
+                    print(Fore.YELLOW + f"Account: {account} has a new email but no verification code or link was found. Subject: {subject}")
+
         if not has_new_email:
-            # Write to the output file if there are no new emails.
-            with open(output_file, "a") as f:
-                f.write(f"Account: {account}:{password} | No new emails\n")
+            no_new_email_accounts.append((account, password))  # Added: save the account in the list of accounts without new emails
     else:
-        print(f"No new emails for account: {account}")
-        has_new_email = False  # Added: indicate the absence of new emails
-        # Write to the output file if there are no new emails.
-        with open(output_file, "a") as f:
-            f.write(f"Account: {account}:{password} | No new emails\n")
+        no_new_email_accounts.append((account, password))  # Added: save the account in the list of accounts without new emails
 
     mail.logout()
 
-# Iterate over all the accounts in the list.
+    # Sort the list of new emails based on the send date (from most recent to least recent)
+    new_email_accounts.sort(key=lambda x: x[2], reverse=True)
+
+
 for account_password in account_list:
     account, password = account_password.split(":")
     try:
-        check_inbox(account, password)
+        check_mailbox(account, password)
+    except Exception as e:
+        print(Fore.RED + f"Error checking account: {account}. Error: {str(e)}")
+
+# Added: write all results to the output file, first grouping accounts with new emails
+with open(output_file, "a") as f:
+    if not file_exists:
+        f.write("-----------\n")
+    f.write(f"Run on {current_time}\n\n")
+    for account, password, subject, verification_code, link in new_email_accounts:
+        f.write(f"Account: {account}:{password} | New email: {subject} | Verification code: {verification_code} | Link: {link}\n")
+    f.write("\n")
+    for account, password in no_new_email_accounts:
+        f.write(f"Account: {account}:{password} | No new email\n")
+    f.write("-----------\n")
+
     except Exception as e:
         print(f"Error checking account: {account}. Error: {str(e)}")
