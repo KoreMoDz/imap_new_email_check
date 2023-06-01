@@ -2,10 +2,10 @@
 account_list_email_password = [re.findall(r"[^@]+@[^@]+\.[^@]+-[^\s]+", line.strip())[0] for line in lines if re.findall(r"[^@]+@[^@]+\.[^@]+-[^\s]+", line.strip())]
 
 # Email- email, Password- password format
-account_list_email_password2 = [re.findall(r"Email-\s*([^@]+@[^@]+\.[^@]+)\s*,\s*Password-\s*([^\s]+)", line.strip())[0] for line in lines if re.findall(r"Email-\s*([^@]+@[^@]+\.[^@]+)\s*,\s*Password-\s*([^\s]+)", line.strip())]
+account_list_email_password = [re.findall(r"Email-\s*([^@]+@[^@]+\.[^@]+)\s*,\s*Password-\s*([^\s]+)", line.strip())[0] for line in lines if re.findall(r"Email-\s*([^@]+@[^@]+\.[^@]+)\s*,\s*Password-\s*([^\s]+)", line.strip())]
 
 # email password format
-account_list_email_password3 = [line.strip().split() for line in lines]
+account_list_email_password = [line.strip().split() for line in lines]
 
 # Roundcube output format Username:    email 
                         # Password:    password
