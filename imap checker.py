@@ -29,8 +29,8 @@ output_file = "output.txt"
 file_exists = os.path.exists(output_file)
 
 current_time = time.strftime("%x at %X")
-new_email_accounts = []  # Added: list to keep track of accounts with new emails
-no_new_email_accounts = []  # Added: list to keep track of accounts without new emails
+new_email_accounts = []  #List to keep track of accounts with new emails
+no_new_email_accounts = []  #List to keep track of accounts without new emails
 
 def generate_imap_server(email_address):
     domain = email_address.split("@")[1]
@@ -107,14 +107,14 @@ def check_mailbox(account, password):
                 if verification_code or link:
                     print(Fore.GREEN + f"Account: {account} has a new email. Subject: {subject}. Verification code: {verification_code}, Link: {link}")
                     has_new_email = True
-                    new_email_accounts.append((account, password, subject, verification_code, link))  # Added: save the account, verification code, and link in the list of new emails
+                    new_email_accounts.append((account, password, subject, verification_code, link))  #Save the account, verification code, and link in the list of new emails
                 else:
                     print(Fore.YELLOW + f"Account: {account} has a new email but no verification code or link was found. Subject: {subject}")
 
         if not has_new_email:
-            no_new_email_accounts.append((account, password))  # Added: save the account in the list of accounts without new emails
+            no_new_email_accounts.append((account, password))  #Save the account in the list of accounts without new emails
     else:
-        no_new_email_accounts.append((account, password))  # Added: save the account in the list of accounts without new emails
+        no_new_email_accounts.append((account, password))  #Save the account in the list of accounts without new emails
 
     mail.logout()
 
@@ -129,7 +129,7 @@ for account_password in account_list:
     except Exception as e:
         print(Fore.RED + f"Error checking account: {account}. Error: {str(e)}")
 
-# Added: write all results to the output file, first grouping accounts with new emails
+#Write all results to the output file, first grouping accounts with new emails
 with open(output_file, "a") as f:
     if not file_exists:
         f.write("-----------\n")
