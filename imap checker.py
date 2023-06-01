@@ -16,7 +16,6 @@ from colorama import Fore, init
 from bs4 import BeautifulSoup
 from datetime import datetime
 
-# Initialize colorama
 init()
 
 # Read credentials from a txt file
@@ -29,8 +28,8 @@ output_file = "output.txt"
 file_exists = os.path.exists(output_file)
 
 current_time = time.strftime("%x at %X")
-new_email_accounts = []  #List to keep track of accounts with new emails
-no_new_email_accounts = []  #List to keep track of accounts without new emails
+new_email_accounts = [] 
+no_new_email_accounts = []  
 
 def generate_imap_server(email_address):
     domain = email_address.split("@")[1]
